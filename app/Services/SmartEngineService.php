@@ -66,7 +66,7 @@ class SmartEngineService
     {
         DB::beginTransaction();
         try {
-            // 1. CLEANUP: Hapus rekaman sistem lama (kecuali yang FINAL)
+            // 1. CLEANUP: Hapus rekaman sistem lama (kecuali yang FINAL / DI-ACC)
             Placement::where('academic_year_id', $academicYearId)
                      ->where(function($query) {
                          $query->where('status_pencocokan', '!=', 'final')
@@ -115,14 +115,19 @@ class SmartEngineService
                 $failReasons = [];
                 $passedScoreAtLeastOnce = false; // Flag untuk Waiting List
 
-                // Cari slot yang jurusannya cocok
+                // FILTER SUPER KETAT: Menyaring Jurusan DAN Gender di Awal!
                 $relevantSlots = $companySlots->filter(function($slot) use ($student) {
-                    return $slot->majors->contains($student->major_id);
+                    // 1. Filter Jurusan
+                    $matchMajor = $slot->majors->contains($student->major_id);
+                    // 2. Filter Gender secara ketat (Abaikan slot lawan jenis)
+                    $matchGender = ($slot->gender_requirement === 'Semua' || $slot->gender_requirement === $student->gender);
+                    
+                    return $matchMajor && $matchGender;
                 });
 
                 if ($relevantSlots->isEmpty()) {
-                    $failReasons[] = "- Tidak ada mitra industri untuk jurusan {$student->major->code}.";
-                    $passedScoreAtLeastOnce = true;
+                    $failReasons[] = "- Tidak ada mitra industri yang membuka kuota untuk Jurusan dan Gender Anda saat ini.";
+                    $passedScoreAtLeastOnce = false;
                 } else {
                     $companyReasons = [];
 
@@ -147,14 +152,9 @@ class SmartEngineService
                     }
 
                     if (!$isPlaced) {
+                        // Saring alasan yang terkumpul (Tanpa alasan gender karena sudah difilter di awal)
                         foreach ($companyReasons as $compId => $reasons) {
-                            $hasNonGenderReason = false;
                             foreach ($reasons as $r) {
-                                if ($r['type'] !== 'gender') { $hasNonGenderReason = true; break; }
-                            }
-
-                            foreach ($reasons as $r) {
-                                if ($hasNonGenderReason && $r['type'] === 'gender') continue;
                                 $failReasons[] = "- {$r['company_name']} ({$r['batch_name']}): {$r['message']}";
                             }
                         }
@@ -192,22 +192,18 @@ class SmartEngineService
 
     private function tryPlaceStudentWithReason($student, $companySlot, $academicYearId)
     {
-        // 1. CEK GENDER (Jurusan sudah difilter di atas)
-        if ($companySlot->gender_requirement !== 'Semua' && $companySlot->gender_requirement !== $student->gender) {
-            return ['status' => false, 'type' => 'gender', 'message' => "Khusus " . ($companySlot->gender_requirement === 'L' ? 'Laki-laki' : 'Perempuan')];
-        }
-
-        // 2. CEK SKOR KUALITAS
+        // 1. CEK SKOR KUALITAS
+        // (Catatan: Pengecekan Gender dihapus dari sini karena sudah difilter di atas)
         if ($student->final_score < $companySlot->min_total_score) {
-            return ['status' => false, 'type' => 'score', 'message' => "Skor SMART rendah."];
+            return ['status' => false, 'type' => 'score', 'message' => "Skor SMART Anda (" . number_format($student->final_score, 2) . ") belum memenuhi standar industri (Min: " . number_format($companySlot->min_total_score, 2) . ")."];
         }
         if ($student->absensi_score < $companySlot->min_absensi_score) {
-            return ['status' => false, 'type' => 'score', 'message' => "Skor Absensi rendah."];
+            return ['status' => false, 'type' => 'score', 'message' => "Skor Absensi/Kehadiran Anda ({$student->absensi_score}) kurang dari standar (Min: {$companySlot->min_absensi_score})."];
         }
 
-        // 3. CEK KUOTA
+        // 2. CEK KUOTA
         if ($companySlot->available_quota <= 0) {
-            return ['status' => false, 'type' => 'kuota', 'message' => "Nilai memenuhi, tetapi Kuota penuh."];
+            return ['status' => false, 'type' => 'kuota', 'message' => "Nilai memenuhi syarat, tetapi kuota penuh."];
         }
 
         // LOLOS

@@ -69,19 +69,19 @@
                 <div class="space-y-5">
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">Nama Kepala Sekolah</label>
-                        <input type="text" name="kepala_sekolah" value="{{ old('kepala_sekolah', $setting->kepala_sekolah ?? '') }}" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Cth: Drs. H. Pendidik Utama, M.Pd.">
+                        <input type="text" name="kepala_sekolah" value="{{ old('kepala_sekolah', $setting->nama_kepala_sekolah ?? '') }}" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Cth: Drs. H. Pendidik Utama, M.Pd.">
                         @error('kepala_sekolah') <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">NIP Kepala Sekolah</label>
-                        <input type="text" name="nip_kepala_sekolah" value="{{ old('nip_kepala_sekolah', $setting->nip_kepala_sekolah ?? '') }}" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Cth: 19800101 200501 1 001">
+                   <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">NIP / NUPTK Kepala Sekolah</label>
+                        <input type="text" name="nip_kepala_sekolah" value="{{ old('nip_kepala_sekolah', $setting->nip_kepala_sekolah ?? '') }}" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Cth: 19800101 200501 1 001 (NIP) atau 123456789 (NUPTK)">
                         @error('nip_kepala_sekolah') <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">Teks Paragraf Pengantar Prakerin (Cetak PDF)</label>
-                        <textarea name="teks_pengantar" rows="6" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition leading-relaxed">{{ old('teks_pengantar', $setting->teks_pengantar ?? '') }}</textarea>
+                        <textarea name="teks_pengantar" rows="6" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition leading-relaxed">{{ old('teks_pengantar', $setting->teks_pengantar_surat ?? 'Dalam rangka pelaksanaan program Pendidikan Sistem Ganda (PSG) dan untuk meningkatkan kompetensi lulusan Sekolah Menengah Kejuruan (SMK), kami memohon kesediaan Bapak/Ibu untuk menerima siswa kami melaksanakan Praktik Kerja Industri (Prakerin) di instansi/perusahaan yang Bapak/Ibu pimpin.') }}</textarea>
                         @error('teks_pengantar') <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>

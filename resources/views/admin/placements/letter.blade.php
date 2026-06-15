@@ -2,15 +2,22 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Surat Pengantar Prakerin</title>
+    <title>Surat Pengantar Prakerin - {{ $company->name }}</title>
     <style>
-        body { font-family: 'Times-Roman', serif; font-size: 14px; line-height: 1.5; color: #000; margin: 20px 40px; }
+        body { 
+            font-family: 'Times-Roman', serif; 
+            font-size: 14px; 
+            line-height: 1.5; 
+            color: #000; 
+            margin: 20px 40px; 
+        }
         
+        /* ... CSS Kop Surat & Info Surat tetap sama ... */
         .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
         .kop-surat h2, .kop-surat h3, .kop-surat p { margin: 0; }
-        .kop-surat h2 { font-size: 20px; text-transform: uppercase; }
-        .kop-surat h3 { font-size: 16px; font-weight: normal; }
-        .kop-surat p { font-size: 12px; }
+        .kop-surat h2 { font-size: 18px; text-transform: uppercase; font-weight: bold; }
+        .kop-surat h1 { font-size: 22px; text-transform: uppercase; font-weight: bold; margin: 0; }
+        .kop-surat p { font-size: 11px; font-style: italic; color: #333; }
         
         .info-surat { margin-bottom: 30px; }
         .info-surat table { width: 100%; border: none; }
@@ -18,24 +25,29 @@
         
         .content { text-align: justify; }
         
-        /* MODIFIKASI AREA TABEL DATA SISWA (Garis Hitam Dihilangkan) */
-        .content-table { width: 85%; margin: 15px 0 15px 20px; border-collapse: collapse; }
-        .content-table td { padding: 4px 0; border: none; } /* <-- border diubah menjadi none agar mulus */
-        .content-table td.label { width: 25%; font-weight: normal; }
+        /* OPTIMASI UNTUK BANYAK SISWA (30+ SISWA) */
+        .content-table { width: 100%; margin: 15px 0; border-collapse: collapse; }
+        .content-table th, .content-table td { padding: 6px; border: 1px solid #000; }
+        .content-table th { background-color: #f2f2f2; }
         
-        .footer { margin-top: 50px; width: 100%; }
+        /* Trik DomPDF: Mengulang header tabel di setiap halaman baru */
+        .content-table thead { display: table-header-group; }
+        
+        /* Trik DomPDF: Mencegah satu baris data terpotong setengah di ujung halaman */
+        .content-table tr { page-break-inside: avoid; }
+        
+        .footer { margin-top: 40px; width: 100%; page-break-inside: avoid; }
         .footer-table { width: 100%; text-align: center; }
-        .ttd-space { height: 80px; }
+        .ttd-space { height: 70px; }
     </style>
 </head>
 <body>
 
     <div class="kop-surat">
-        <h2>PEMERINTAH PROVINSI JAWA BARAT</h2>
+        <h2>{{ $settings->instansi_atas ?? 'PEMERINTAH PROVINSI JAWA BARAT' }}</h2>
         <h2>DINAS PENDIDIKAN</h2>
-        <h3>SMK NEGERI 1 CONTOH</h3>
-        <p>Jl. Pendidikan No. 123, Kota Contoh, Kode Pos 12345</p>
-        <p>Telepon: (021) 1234567 | Email: info@smkn1contoh.sch.id | Web: www.smkn1contoh.sch.id</p>
+        <h1>{{ $settings->nama_sekolah ?? 'SMK NEGERI 1 SPK' }}</h1>
+        <p>{{ $settings->alamat_sekolah ?? 'Jl. Pendidikan No. 123, Alamat Sekolah, Kode Pos 12345' }}</p>
     </div>
 
     <div class="info-surat">
@@ -43,8 +55,12 @@
             <tr>
                 <td width="15%">Nomor</td>
                 <td width="2%">:</td>
-                <td width="48%">421.5/123/SMKN1/{{ date('Y') }}</td>
-                <td width="35%" style="text-align: right;">Kota Contoh, {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}</td>
+                <td width="48%">
+                    421.5/123/SMK-SPK/{{ date('Y') }}
+                </td>
+                <td width="35%" style="text-align: right;">
+                    {{ $date_now ?? \Carbon\Carbon::now()->translatedFormat('d F Y') }}
+                </td>
             </tr>
             <tr>
                 <td>Lampiran</td>
@@ -62,34 +78,45 @@
     </div>
 
     <div class="content">
-        <p>Yth. Pimpinan/HRD <b>{{ $placement->company->name }}</b><br>
-        {{ $placement->company->address }}</p>
+        <p>Yth. Pimpinan/HRD <b>{{ $company->name }}</b><br>
+        {{ $company->address }}</p>
 
         <p>Dengan hormat,</p>
-        <p>Dalam rangka pelaksanaan program Pendidikan Sistem Ganda (PSG) dan untuk meningkatkan kompetensi lulusan Sekolah Menengah Kejuruan (SMK), kami memohon kesediaan Bapak/Ibu untuk menerima siswa kami melaksanakan Praktik Kerja Industri (Prakerin) di instansi/perusahaan yang Bapak/Ibu pimpin.</p>
         
-        <p>Adapun siswa yang direkomendasikan berdasarkan hasil seleksi akademik (Metode SMART) adalah sebagai berikut:</p>
+        <p>
+            {{ $settings->teks_pengantar_surat ?? 'Dalam rangka pelaksanaan program Pendidikan Sistem Ganda (PSG) dan untuk meningkatkan kompetensi lulusan Sekolah Menengah Kejuruan (SMK), kami memohon kesediaan Bapak/Ibu untuk menerima siswa kami melaksanakan Praktik Kerja Industri (Prakerin) di instansi/perusahaan yang Bapak/Ibu pimpin.' }}
+        </p>
+        
+        <p>
+            Adapun siswa yang direkomendasikan adalah sebagai berikut:
+        </p>
 
         <table class="content-table">
-            <tr>
-                <td class="label">Nama Lengkap</td>
-                <td>: {{ $placement->student->name }}</td>
-            </tr>
-            <tr>
-                <td class="label">NISN</td>
-                <td>: {{ $placement->student->nisn }}</td>
-            </tr>
-            <tr>
-                <td class="label">Kelas / Jurusan</td>
-                <td>: {{ $placement->student->class }} / {{ $placement->student->major->name }}</td>
-            </tr>
-            <tr>
-                <td class="label">Tahun Ajaran</td>
-                <td>: {{ $placement->academicYear->name }}</td>
-            </tr>
+            <thead>
+                <tr>
+                    <th style="width: 5%;">No</th>
+                    <th style="width: 35%;">Nama Lengkap</th>
+                    <th style="width: 20%;">NISN</th>
+                    <th style="width: 25%;">Kelas / Jurusan</th>
+                    <th style="width: 15%;">Gelombang</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($placements as $index => $placement)
+                <tr>
+                    <td style="text-align: center;">{{ $index + 1 }}</td>
+                    <td>{{ $placement->student->name ?? '-' }}</td>
+                    <td style="text-align: center;">{{ $placement->student->nisn ?? '-' }}</td>
+                    <td style="text-align: center;">XII / {{ $placement->student->major->name ?? '-' }}</td>
+                    <td style="text-align: center;">{{ $placement->companySlot->batch_name ?? '-' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
         </table>
 
-        <p>Demikian surat permohonan ini kami sampaikan. Besar harapan kami Bapak/Ibu dapat mengabulkan permohonan ini. Atas perhatian dan kerja sama yang baik, kami ucapkan terima kasih.</p>
+        <p>
+            Demikian surat permohonan ini kami sampaikan. Besar harapan kami Bapak/Ibu dapat mengabulkan permohonan ini. Atas perhatian dan kerja sama yang baik, kami ucapkan terima kasih.
+        </p>
     </div>
 
     <div class="footer">
@@ -97,9 +124,12 @@
             <tr>
                 <td width="50%"></td>
                 <td width="50%">
-                    <p>Kepala SMK Negeri 1 Contoh,</p>
+                    <p>Kepala {{ $settings->nama_sekolah ?? 'SMK Negeri 1 SPK' }},</p>
                     <div class="ttd-space"></div>
-                    <p><b><u>Dr. Nama Kepala Sekolah, M.Pd.</u></b><br>NIP. 19700101 199802 1 001</p>
+                    <p>
+                        <b><u>{{ $settings->nama_kepala_sekolah ?? 'Dr. Nama Kepala Sekolah, M.Pd.' }}</u></b><br>
+                        NIP / NUPTK. {{ $settings->nip_kepala_sekolah ?? '19700101 199802 1 001' }}
+                    </p>
                 </td>
             </tr>
         </table>

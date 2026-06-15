@@ -43,4 +43,13 @@ class CompanySlot extends Model
     {
         return $this->belongsToMany(Major::class, 'company_slot_major', 'company_slot_id', 'major_id');
     }
+
+    /**
+     * Relasi One-to-Many ke Placement
+     * 1 Slot bisa ditempati oleh banyak penempatan siswa
+     */
+    public function placements()
+    {
+        return $this->hasMany(Placement::class);
+    }
 }
