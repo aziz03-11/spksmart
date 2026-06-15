@@ -14,6 +14,7 @@ class AppSetting extends Model
         'logo_path', 
         'nama_kepala_sekolah', 
         'nip_kepala_sekolah', 
-        'teks_pengantar_surat'
+        'teks_pengantar_surat',
+        'wa_template_message',
     ];
 }

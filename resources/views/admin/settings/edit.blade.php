@@ -7,7 +7,7 @@
     
     <div class="border-b border-gray-100 pb-4">
         <h1 class="text-2xl font-extrabold text-gray-900">⚙️ Pengaturan Aplikasi & Kop Surat</h1>
-        <p class="text-sm text-gray-500 mt-1">Sesuaikan identitas sekolah, logo, dan data kepala sekolah untuk keperluan cetak dokumen SPK.</p>
+        <p class="text-sm text-gray-500 mt-1">Sesuaikan identitas sekolah, logo, data kepala sekolah, dan template pesan untuk keperluan komunikasi & cetak dokumen SPK.</p>
     </div>
 
     @if (session('success'))
@@ -63,7 +63,7 @@
 
             <div class="bg-white p-8 shadow-sm rounded-2xl border border-gray-100 h-fit">
                 <header class="mb-6 border-b border-gray-50 pb-4">
-                    <h2 class="text-lg font-bold text-gray-900">Data Kepala Sekolah & Surat</h2>
+                    <h2 class="text-lg font-bold text-gray-900">Data & Template Surat / Pesan</h2>
                 </header>
 
                 <div class="space-y-5">
@@ -84,6 +84,20 @@
                         <textarea name="teks_pengantar" rows="6" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-4 py-3 bg-gray-50 focus:bg-white transition leading-relaxed">{{ old('teks_pengantar', $setting->teks_pengantar_surat ?? 'Dalam rangka pelaksanaan program Pendidikan Sistem Ganda (PSG) dan untuk meningkatkan kompetensi lulusan Sekolah Menengah Kejuruan (SMK), kami memohon kesediaan Bapak/Ibu untuk menerima siswa kami melaksanakan Praktik Kerja Industri (Prakerin) di instansi/perusahaan yang Bapak/Ibu pimpin.') }}</textarea>
                         @error('teks_pengantar') <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p> @enderror
                     </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Template Pesan WhatsApp Wali Murid</label>
+                        <textarea name="wa_template_message" rows="5" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm px-4 py-3 bg-emerald-50/30 focus:bg-white transition leading-relaxed">{{ old('wa_template_message', $setting->wa_template_message ?? 'Halo Bapak/Ibu Wali dari [NAMA_SISWA], menginformasikan bahwa putra/putri Bapak/Ibu telah mendapatkan Rekomendasi Penempatan Prakerin di [NAMA_PT] pada [GELOMBANG]. Rencana keberangkatan: [TANGGAL_BERANGKAT]. Mohon konfirmasi kesediaannya. Terima kasih.') }}</textarea>
+                        <p class="mt-2 text-[11px] text-gray-500 font-bold leading-tight">
+                            Kata kunci otomatis: <br>
+                            <code class="bg-gray-100 text-pink-600 px-1 py-0.5 rounded">[NAMA_SISWA]</code>, 
+                            <code class="bg-gray-100 text-pink-600 px-1 py-0.5 rounded">[NAMA_PT]</code>, 
+                            <code class="bg-gray-100 text-pink-600 px-1 py-0.5 rounded">[GELOMBANG]</code>, 
+                            <code class="bg-gray-100 text-pink-600 px-1 py-0.5 rounded">[TANGGAL_BERANGKAT]</code>.
+                        </p>
+                        @error('wa_template_message') <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p> @enderror
+                    </div>
+
                 </div>
             </div>
 

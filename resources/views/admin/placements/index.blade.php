@@ -81,7 +81,56 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-extrabold text-gray-900">{{ $placement->student->name }}</div>
                             <div class="text-xs font-bold text-gray-400 mt-0.5 tracking-wide">NISN: {{ $placement->student->nisn }}</div>
-                        </td>
+                            
+                            @if(in_array($placement->status_pencocokan, ['rekomendasi', 'final']))
+                                @if($placement->student->parent_phone)
+                                    @php
+                                        // 1. Format Nomor WhatsApp
+                                        $waNumber = preg_replace('/[^0-9]/', '', $placement->student->parent_phone);
+                                        if (str_starts_with($waNumber, '0')) {
+                                            $waNumber = '62' . substr($waNumber, 1);
+                                        }
+                                
+                                        // 2. Ambil Template dari Database atau gunakan default
+                                        $setting = \App\Models\AppSetting::first();
+                                        $defaultTemplate = "Halo Bapak/Ibu Wali dari [NAMA_SISWA], menginformasikan bahwa putra/putri Bapak/Ibu telah mendapatkan Rekomendasi Penempatan Prakerin di [NAMA_PT] pada [GELOMBANG]. Rencana keberangkatan: [TANGGAL_BERANGKAT]. Mohon konfirmasi kesediaannya. Terima kasih.";
+                                        $template = $setting->wa_template_message ?? $defaultTemplate;
+                                
+                                        // 3. Siapkan Variabel Dinamis
+                                        $namaSiswa = $placement->student->name;
+                                        $namaPt = $placement->company ? $placement->company->name : 'Dalam Proses Seleksi';
+                                        $gelombang = $placement->companySlot ? $placement->companySlot->batch_name : '-';
+                                        
+                                        // Memformat tanggal keberangkatan menjadi bahasa Indonesia
+                                        $tglBerangkat = ($placement->companySlot && $placement->companySlot->start_date) 
+                                            ? \Carbon\Carbon::parse($placement->companySlot->start_date)->translatedFormat('d F Y') 
+                                            : 'Belum ditentukan';
+                                
+                                        // 4. Timpa kata kunci dengan data asli (str_replace)
+                                        $pesanFinal = str_replace(
+                                            ['[NAMA_SISWA]', '[NAMA_PT]', '[GELOMBANG]', '[TANGGAL_BERANGKAT]'],
+                                            [$namaSiswa, $namaPt, $gelombang, $tglBerangkat],
+                                            $template
+                                        );
+                                        
+                                        // 5. Encode URL agar aman dikirim ke browser/aplikasi WA
+                                        $pesanEncoded = urlencode($pesanFinal);
+                                    @endphp
+                                    <div class="mt-2">
+                                        <a href="https://wa.me/{{ $waNumber }}?text={{ $pesanEncoded }}" target="_blank" class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition shadow-sm">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.383 0 0 5.383 0 12.031c0 2.124.553 4.195 1.604 6.012L.113 23.887l5.969-1.564a11.96 11.96 0 005.949 1.585h.005c6.647 0 12.03-5.383 12.03-12.031C24.066 5.383 18.678 0 12.031 0zm0 21.906h-.003a9.924 9.924 0 01-5.06-1.378l-.362-.214-3.766.987.998-3.673-.235-.374a9.945 9.945 0 01-1.521-5.31C2.08 5.485 7.487 0 12.031 0c5.448 0 9.877 4.43 9.877 9.877s-4.43 9.877-9.877 9.877zm5.422-7.399c-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.668.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.297-.496.099-.198.05-.372-.025-.52-.074-.149-.668-1.611-.916-2.206-.24-.579-.485-.501-.668-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.463 1.065 2.877 1.213 3.076.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.086 1.758-.718 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                                            Hubungi WA Wali
+                                        </a>
+                                    </div>
+                                @else
+                                    <div class="mt-2">
+                                        <span class="inline-flex items-center gap-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-lg">
+                                            ❌ No. Wali Kosong
+                                        </span>
+                                    </div>
+                                @endif
+                            @endif
+                            </td>
                         
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-bold text-gray-800">{{ $placement->student->class_name ?? '-' }}</div>

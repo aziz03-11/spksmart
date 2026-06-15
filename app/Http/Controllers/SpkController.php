@@ -8,6 +8,7 @@ use App\Models\AcademicYear;
 use App\Models\Placement;
 use App\Models\Company;
 use App\Models\CompanySlot;
+use App\Models\Student;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Exports\PlacementsExport;
@@ -53,27 +54,48 @@ class SpkController extends Controller
             return back()->with('error', 'Tidak ada Tahun Ajaran yang sedang aktif.');
         }
 
-        $studentsWithoutAssessment = \App\Models\Student::where('academic_year_id', $activeYear->id)
-                                        ->doesntHave('assessment')
-                                        ->count();
+        // =========================================================================
+        // UPDATE PERBAIKAN: PERLINDUNGAN DATA FINAL (LOCK MECHANISM)
+        // =========================================================================
+
+        // 1. Ambil ID siswa-siswa yang status penempatannya SUDAH FINAL di periode ini
+        $finalizedStudentIds = Placement::where('academic_year_id', $activeYear->id)
+            ->where('status_pencocokan', 'final')
+            ->pluck('student_id')
+            ->toArray();
+
+        // 2. Cek apakah ada siswa (yang BELUM FINAL) tapi belum punya nilai
+        $studentsWithoutAssessment = Student::where('academic_year_id', $activeYear->id)
+            ->whereNotIn('id', $finalizedStudentIds) // Abaikan siswa yang sudah final
+            ->doesntHave('assessment')
+            ->count();
 
         if ($studentsWithoutAssessment > 0) {
-            return back()->with('error', "Gagal memproses! Terdapat {$studentsWithoutAssessment} siswa yang belum memiliki nilai. Harap lengkapi nilai seluruh siswa terlebih dahulu.");
+            return back()->with('error', "Gagal memproses! Terdapat {$studentsWithoutAssessment} siswa (yang belum final) belum memiliki nilai evaluasi. Harap lengkapi nilai seluruh siswa terlebih dahulu.");
         }
 
         try {
-            $this->smartEngine->runMatchmaking($activeYear->id);
+            DB::beginTransaction();
+
+            // 3. Hapus rekam jejak rekomendasi lama, KECUALI yang sudah final
+            Placement::where('academic_year_id', $activeYear->id)
+                ->where('status_pencocokan', '!=', 'final')
+                ->delete();
+
+            // 4. Panggil Service Engine
+            // Catatan: Pastikan di dalam SmartEngineService Anda juga mengecualikan siswa yang id-nya ada di $finalizedStudentIds saat melakukan query $students = Student::all() atau sejenisnya.
+            $this->smartEngine->runMatchmaking($activeYear->id, $finalizedStudentIds);
+
+            DB::commit();
 
             return redirect()->route('admin.placements.index')
-                             ->with('success', 'Kalkulasi SPK dan pencocokan industri berhasil diselesaikan!');
+                             ->with('success', 'Kalkulasi SPK berhasil diperbarui! Siswa yang berstatus FINAL aman tidak terganggu.');
+                             
         } catch (\Exception $e) {
+            DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan sistem: ' . $e->getMessage());
         }
     }
-
-    // ========================================================
-    // FITUR: MANUAL OVERRIDE (INTERVENSI MANUAL)
-    // ========================================================
 
     // ========================================================
     // FITUR: MANUAL OVERRIDE (INTERVENSI MANUAL)
