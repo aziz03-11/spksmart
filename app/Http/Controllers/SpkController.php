@@ -32,7 +32,6 @@ class SpkController extends Controller
         $placements = [];
 
         if ($selectedYearId) {
-            // HANYA memuat siswa yang BELUM FINAL / Belum di-ACC
             $placements = Placement::where('academic_year_id', $selectedYearId)
                 ->where(function($query) {
                     $query->where('status_pencocokan', '!=', 'final')
@@ -54,37 +53,41 @@ class SpkController extends Controller
             return back()->with('error', 'Tidak ada Tahun Ajaran yang sedang aktif.');
         }
 
-        // 1. Ambil ID siswa-siswa yang status penempatannya SUDAH FINAL di periode ini
-        $finalizedStudentIds = Placement::where('academic_year_id', $activeYear->id)
-            ->where('status_pencocokan', 'final')
+        // KUNCI SISWA: Ambil ID siswa yang sudah FINAL atau hasil INTERVENSI MANUAL
+        $lockedStudentIds = Placement::where('academic_year_id', $activeYear->id)
+            ->where(function($q) {
+                $q->where('status_pencocokan', 'final')
+                  ->orWhere('placement_method', 'MANUAL_OVERRIDE');
+            })
             ->pluck('student_id')
             ->toArray();
 
-        // 2. Cek apakah ada siswa (yang BELUM FINAL) tapi belum punya nilai
+        // Cek apakah ada siswa (yang BELUM TERKUNCI) tapi belum punya nilai
         $studentsWithoutAssessment = Student::where('academic_year_id', $activeYear->id)
-            ->whereNotIn('id', $finalizedStudentIds)
+            ->whereNotIn('id', $lockedStudentIds)
             ->doesntHave('assessment')
             ->count();
 
         if ($studentsWithoutAssessment > 0) {
-            return back()->with('error', "Gagal memproses! Terdapat {$studentsWithoutAssessment} siswa (yang belum final) belum memiliki nilai evaluasi. Harap lengkapi nilai seluruh siswa terlebih dahulu.");
+            return back()->with('error', "Gagal memproses! Terdapat {$studentsWithoutAssessment} siswa belum memiliki nilai evaluasi. Harap lengkapi nilai terlebih dahulu.");
         }
 
         try {
             DB::beginTransaction();
 
-            // 3. Hapus rekam jejak rekomendasi lama, KECUALI yang sudah final
+            // PENTING: Hapus rekomendasi lama, HANYA MILIK SYSTEM! (Jangan hapus intervensi manual)
             Placement::where('academic_year_id', $activeYear->id)
+                ->where('placement_method', 'SYSTEM')
                 ->where('status_pencocokan', '!=', 'final')
                 ->delete();
 
-            // 4. Panggil Service Engine
-            $this->smartEngine->runMatchmaking($activeYear->id, $finalizedStudentIds);
+            // Panggil Service Engine dan masukkan data ID yang dikunci
+            $this->smartEngine->runMatchmaking($activeYear->id, $lockedStudentIds);
 
             DB::commit();
 
             return redirect()->route('admin.placements.index')
-                             ->with('success', 'Kalkulasi SPK berhasil diperbarui! Siswa yang berstatus FINAL aman tidak terganggu.');
+                             ->with('success', 'Kalkulasi SPK berhasil diperbarui! Siswa Final & hasil Intervensi aman terkunci.');
                              
         } catch (\Exception $e) {
             DB::rollBack();
@@ -95,7 +98,6 @@ class SpkController extends Controller
     public function edit(Placement $placement)
     {
         $placement->load(['student.major', 'student.assessment', 'company', 'companySlot']);
-        
         $studentGender = $placement->student->gender;
 
         $allSlots = CompanySlot::with('company')
@@ -123,21 +125,28 @@ class SpkController extends Controller
             'notes' => 'required|string'
         ]);
 
+        // FITUR LOG TRAIL: Tangkap Waktu, Admin, dan Gabungkan dengan catatan lama
+        $timestamp = now()->translatedFormat('d M Y H:i');
+        $adminName = auth()->user()->name ?? 'Administrator Hubin';
+        $existingNotes = $placement->notes ? $placement->notes . "\n\n" : "";
+
         // ==========================================
         // TINDAKAN 1: BATALKAN PENEMPATAN
         // ==========================================
         if ($validated['action_type'] === 'cancel') {
             
-            // Logika Cerdas: Jika sebelumnya siswa punya perusahaan (berarti lolos kualifikasi),
-            // kembalikan ke Waiting List. Jika dari awal memang tidak lulus, tetapkan di Pembinaan.
             $newStatus = ($placement->company_id !== null) ? 'waiting_list' : 'pembinaan';
+            $companyName = $placement->company->name ?? 'Sistem';
+            
+            // Format Log
+            $logMessage = "[$timestamp] 👤 $adminName\n❌ DIBATALKAN dari $companyName\n📝 Alasan: " . $validated['notes'];
 
             $placement->update([
                 'company_id' => null,
                 'company_slot_id' => null,
                 'status_pencocokan' => $newStatus,
                 'placement_method' => 'MANUAL_OVERRIDE',
-                'notes' => "DIBATALKAN KEPALA HUBIN:\n" . $validated['notes'],
+                'notes' => $existingNotes . $logMessage, // Append (Sambungkan)
             ]);
 
             if ($placement->student) {
@@ -145,7 +154,7 @@ class SpkController extends Controller
             }
 
             $pesan = $newStatus === 'waiting_list' 
-                     ? 'Penempatan dibatalkan. Karena nilai mencukupi, siswa dialihkan ke status Waiting List.' 
+                     ? 'Penempatan dibatalkan. Karena nilai mencukupi, siswa dialihkan ke Waiting List dan Terkunci dari SPK otomatis.' 
                      : 'Intervensi dibatalkan. Siswa dikembalikan ke daftar Pembinaan.';
                      
             return redirect()->route('admin.placements.index')->with('success', $pesan);
@@ -170,36 +179,34 @@ class SpkController extends Controller
                 return back()->with('error', 'Gagal: Kuota untuk industri ini sudah penuh, silakan pilih industri lain.')->withInput();
             }
 
+            $oldCompanyName = $placement->company->name ?? 'Belum ada PT';
+            
+            // Format Log
+            $logMessage = "[$timestamp] 👤 $adminName\n🔄 DIPINDAH dari $oldCompanyName ke {$slot->company->name}\n📝 Alasan: " . $validated['notes'];
+
             $placement->update([
                 'company_id' => $slot->company_id,
                 'company_slot_id' => $slot->id,
                 'status_pencocokan' => 'rekomendasi',
                 'placement_method' => 'MANUAL_OVERRIDE',
-                'notes' => "DIPINDAHKAN KEPALA HUBIN:\n" . $validated['notes']
+                'notes' => $existingNotes . $logMessage
             ]);
 
             if ($placement->student) {
                 $placement->student->update(['status' => 'proses_seleksi']);
             }
 
-            return redirect()->route('admin.placements.index')->with('success', 'Siswa berhasil dipindahkan ke Perusahaan baru. Silakan klik ACC Hubin untuk mem-Final-kan.');
+            return redirect()->route('admin.placements.index')->with('success', 'Siswa berhasil dipindahkan. Jejak log intervensi berhasil dicatat.');
         }
     }
 
     public function accHubin(Placement $placement)
     {
         if ($placement->status_pencocokan === 'rekomendasi') {
-            $placement->update([
-                'status_pencocokan' => 'final'
-            ]);
-
-            if ($placement->student) {
-                $placement->student->update(['status' => 'lolos_prakerin']);
-            }
-
+            $placement->update(['status_pencocokan' => 'final']);
+            if ($placement->student) { $placement->student->update(['status' => 'lolos_prakerin']); }
             return redirect()->back()->with('success', 'Penempatan siswa berhasil di-ACC (Final).');
         }
-
         return redirect()->back()->with('error', 'Hanya status Rekomendasi yang dapat di-ACC.');
     }
 
@@ -215,17 +222,10 @@ class SpkController extends Controller
         $activeYear = AcademicYear::where('is_active', true)->first();
         $selectedYearId = $request->get('academic_year_id', $activeYear ? $activeYear->id : null);
 
-        if (!$selectedYearId) {
-            return back()->with('error', 'Tidak ada data Tahun Ajaran untuk dicetak.');
-        }
+        if (!$selectedYearId) { return back()->with('error', 'Tidak ada data Tahun Ajaran untuk dicetak.'); }
 
-        $placements = Placement::where('academic_year_id', $selectedYearId)
-            ->with(['student.major', 'company'])
-            ->orderBy('final_smart_score', 'desc')
-            ->get();
-
+        $placements = Placement::where('academic_year_id', $selectedYearId)->with(['student.major', 'company'])->orderBy('final_smart_score', 'desc')->get();
         $selectedYear = AcademicYear::find($selectedYearId);
-
         $pdf = Pdf::loadView('admin.placements.pdf', compact('placements', 'selectedYear'));
         $pdf->setPaper('a4', 'landscape');
 

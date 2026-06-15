@@ -62,11 +62,12 @@ class SmartEngineService
         return 0;
     }
 
-    public function runMatchmaking($academicYearId)
+    // MENAMBAHKAN PARAMETER $lockedStudentIds DARI CONTROLLER
+    public function runMatchmaking($academicYearId, $lockedStudentIds = [])
     {
         DB::beginTransaction();
         try {
-            // 1. CLEANUP: Hapus rekaman sistem lama (kecuali yang FINAL / DI-ACC)
+            // 1. CLEANUP: Hapus rekaman sistem lama HANYA milik SYSTEM yang belum final.
             Placement::where('academic_year_id', $academicYearId)
                      ->where(function($query) {
                          $query->where('status_pencocokan', '!=', 'final')
@@ -75,15 +76,14 @@ class SmartEngineService
                      ->where('placement_method', 'SYSTEM') 
                      ->delete();
 
+            // UPDATE STATUS SISWA: Kembalikan ke 'belum_prakerin' HANYA JIKA TIDAK TERKUNCI
             Student::where('academic_year_id', $academicYearId)
-                   ->whereDoesntHave('placement', function($query) {
-                       $query->where('placement_method', 'MANUAL_OVERRIDE')
-                             ->orWhere('status_pencocokan', 'final');
-                   })
+                   ->whereNotIn('id', $lockedStudentIds)
                    ->update(['status' => 'belum_prakerin']); 
                    
+            // 2. AMBIL DATA SISWA YANG TIDAK TERKUNCI SAJA (Abaikan hasil intervensi & final)
             $students = Student::where('academic_year_id', $academicYearId)
-                ->where('status', '!=', 'lolos_prakerin')
+                ->whereNotIn('id', $lockedStudentIds)
                 ->with(['assessment', 'major'])
                 ->get();
 
@@ -109,7 +109,7 @@ class SmartEngineService
 
             $students = $students->sortByDesc('final_score');
 
-            // 2. PROSES PENEMPATAN
+            // 3. PROSES PENEMPATAN
             foreach ($students as $student) {
                 $isPlaced = false;
                 $failReasons = [];
@@ -152,7 +152,7 @@ class SmartEngineService
                     }
 
                     if (!$isPlaced) {
-                        // Saring alasan yang terkumpul (Tanpa alasan gender karena sudah difilter di awal)
+                        // Saring alasan yang terkumpul
                         foreach ($companyReasons as $compId => $reasons) {
                             foreach ($reasons as $r) {
                                 $failReasons[] = "- {$r['company_name']} ({$r['batch_name']}): {$r['message']}";
@@ -193,7 +193,6 @@ class SmartEngineService
     private function tryPlaceStudentWithReason($student, $companySlot, $academicYearId)
     {
         // 1. CEK SKOR KUALITAS
-        // (Catatan: Pengecekan Gender dihapus dari sini karena sudah difilter di atas)
         if ($student->final_score < $companySlot->min_total_score) {
             return ['status' => false, 'type' => 'score', 'message' => "Skor SMART Anda (" . number_format($student->final_score, 2) . ") belum memenuhi standar industri (Min: " . number_format($companySlot->min_total_score, 2) . ")."];
         }

@@ -25,6 +25,15 @@
             </div>
         </div>
 
+        @if($placement->notes && $placement->placement_method === 'MANUAL_OVERRIDE')
+            <div class="mb-8">
+                <label class="block text-sm font-extrabold text-gray-700 mb-2">📜 Jejak Intervensi (Log Trail) Sebelumnya:</label>
+                <div class="bg-slate-900 p-4 rounded-xl text-xs text-emerald-400 font-mono leading-relaxed shadow-inner whitespace-pre-wrap overflow-y-auto max-h-48 border border-slate-700">
+{{ $placement->notes }}
+                </div>
+            </div>
+        @endif
+
         <form action="{{ route('admin.placements.update', $placement->id) }}" method="POST">
             @csrf
             @method('PUT')
@@ -32,7 +41,7 @@
             <div class="space-y-6">
                 
                 <div>
-                    <label class="block text-sm font-extrabold text-gray-700 mb-3">Pilih Tindakan Intervensi:</label>
+                    <label class="block text-sm font-extrabold text-gray-700 mb-3">Tindakan Intervensi Baru:</label>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         
                         <label class="border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:bg-indigo-50/50 transition flex items-start gap-3 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
@@ -47,7 +56,7 @@
                             <input type="radio" name="action_type" value="cancel" class="mt-1 w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500" onchange="toggleInterventionForm()">
                             <div>
                                 <div class="font-black text-sm text-amber-700">Batalkan Penempatan</div>
-                                <div class="text-xs text-gray-500 mt-1 leading-relaxed">Penempatan dibatalkan (Wali tidak setuju, sakit, dll). Jika nilai mencukupi, siswa akan dialihkan ke <b class="text-amber-700">Waiting List</b>.</div>
+                                <div class="text-xs text-gray-500 mt-1 leading-relaxed">Penempatan dibatalkan (Wali tidak setuju, sakit, dll). Jika nilai mencukupi, siswa dialihkan ke <b class="text-amber-700">Waiting List</b>.</div>
                             </div>
                         </label>
 
@@ -71,9 +80,9 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-extrabold text-gray-700 mb-2">Catatan / Alasan Kronologis (Wajib):</label>
-                    <textarea name="notes" rows="4" required class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Jelaskan alasan spesifik... (Contoh: Penempatan dibatalkan karena wali siswa tidak mengizinkan penempatan di luar kota)"></textarea>
-                    <p class="text-xs text-gray-400 font-medium mt-2">*Catatan ini akan terekam permanen di Excel/PDF untuk transparansi kepada sekolah dan wali.</p>
+                    <label class="block text-sm font-extrabold text-gray-700 mb-2">Alasan / Catatan Intervensi (Wajib):</label>
+                    <textarea name="notes" rows="3" required class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Jelaskan alasan spesifik... (Contoh: Penempatan dibatalkan karena wali siswa tidak mengizinkan penempatan di luar kota)"></textarea>
+                    <p class="text-xs text-gray-400 font-medium mt-2">*Catatan ini akan ditambahkan ke log trail untuk transparansi kepada sekolah dan wali.</p>
                 </div>
 
                 <div class="flex justify-end gap-3 pt-6 border-t border-gray-100">
