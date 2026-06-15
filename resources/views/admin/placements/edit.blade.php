@@ -3,91 +3,106 @@
 @section('title', 'Intervensi Manual Penempatan')
 
 @section('content')
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-3xl mx-auto space-y-6">
     
-    @if (session('error'))
-        <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-4 rounded-xl shadow-sm font-medium text-sm flex items-center animate-fade-in">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            {{ session('error') }}
-        </div>
-    @endif
-
-    <div class="flex justify-between items-center border-b border-gray-200 pb-4">
-        <div>
-            <h1 class="text-xl font-black text-gray-900">⚙️ Intervensi Manual Penempatan</h1>
-            <p class="text-sm text-gray-500 mt-1">Paksa penempatan siswa secara manual mengabaikan rekomendasi SMART.</p>
-        </div>
-        <a href="{{ route('admin.placements.index') }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-bold transition">
-            Batal & Kembali
+    <div class="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+        <a href="{{ route('admin.placements.index') }}" class="text-gray-400 hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 p-2 rounded-xl">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
         </a>
+        <h1 class="text-2xl font-black text-gray-900">⚙️ Intervensi Manual</h1>
     </div>
 
-    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-6">
-        <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center text-2xl font-black">
-            {{ substr($placement->student->name, 0, 1) }}
-        </div>
-        <div>
-            <h2 class="text-xl font-black text-gray-900">{{ $placement->student->name }}</h2>
-            <div class="flex items-center gap-3 mt-1 text-sm font-medium text-gray-500">
-                <span class="bg-gray-100 px-2 py-0.5 rounded">{{ $placement->student->nisn ?? 'NISN Kosong' }}</span>
-                <span>{{ $placement->student->major->name }} ({{ $placement->student->major->code }})</span>
-                <span class="font-bold {{ $placement->student->gender === 'L' ? 'text-blue-600' : 'text-pink-600' }}">Gender: {{ $placement->student->gender === 'L' ? 'Laki-laki' : 'Perempuan' }}</span>
-            </div>
-            
-            <div class="mt-3 text-xs">
-                Status Saat Ini: 
-                @if($placement->status_pencocokan === 'rekomendasi')
-                    <span class="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Rekomendasi Sistem</span>
-                @elseif($placement->status_pencocokan === 'waiting_list')
-                    <span class="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Menunggu Slot Industri</span>
-                @else
-                    <span class="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">Pembinaan (Gagal Nilai)</span>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <div class="bg-white p-6 rounded-2xl border border-amber-200 shadow-sm relative overflow-hidden">
-        <div class="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
+    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100">
         
-        <form action="{{ route('admin.placements.update', $placement->id) }}" method="POST" class="space-y-6">
+        <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Data Siswa</p>
+                <p class="text-lg font-black text-indigo-900">{{ $placement->student->name }} <span class="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded ml-1">{{ $placement->student->major->code ?? '-' }}</span></p>
+            </div>
+            <div class="md:text-right">
+                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Rekomendasi PT Saat Ini</p>
+                <p class="text-sm font-bold text-gray-700">{{ $placement->company->name ?? 'Tidak Ada / Masuk Pembinaan' }}</p>
+            </div>
+        </div>
+
+        <form action="{{ route('admin.placements.update', $placement->id) }}" method="POST">
             @csrf
             @method('PUT')
 
-            <div class="bg-amber-50 p-4 rounded-xl border border-amber-100 text-sm text-amber-800 font-medium mb-6">
-                <strong>Peringatan:</strong> Memilih perusahaan di bawah ini akan secara paksa menempatkan siswa tersebut, memotong kuota perusahaan, dan mengubah statusnya menjadi <strong>FINAL (DI-ACC)</strong> secara permanen.
-            </div>
+            <div class="space-y-6">
+                
+                <div>
+                    <label class="block text-sm font-extrabold text-gray-700 mb-3">Pilih Tindakan Intervensi:</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        <label class="border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:bg-indigo-50/50 transition flex items-start gap-3 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                            <input type="radio" name="action_type" value="move" class="mt-1 w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked onchange="toggleInterventionForm()">
+                            <div>
+                                <div class="font-black text-sm text-indigo-900">Pindahkan ke PT Lain</div>
+                                <div class="text-xs text-gray-500 mt-1 leading-relaxed">Siswa tetap diberangkatkan, tetapi dialihkan ke perusahaan atau gelombang yang berbeda.</div>
+                            </div>
+                        </label>
+                        
+                        <label class="border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:bg-amber-50/50 transition flex items-start gap-3 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+                            <input type="radio" name="action_type" value="cancel" class="mt-1 w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500" onchange="toggleInterventionForm()">
+                            <div>
+                                <div class="font-black text-sm text-amber-700">Batalkan Penempatan</div>
+                                <div class="text-xs text-gray-500 mt-1 leading-relaxed">Penempatan dibatalkan (Wali tidak setuju, sakit, dll). Jika nilai mencukupi, siswa akan dialihkan ke <b class="text-amber-700">Waiting List</b>.</div>
+                            </div>
+                        </label>
 
-            <div>
-                <label class="block text-sm font-bold text-gray-700 mb-2">Pilih Perusahaan & Gelombang Tujuan <span class="text-red-500">*</span></label>
-                <select name="company_slot_id" required class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-3 bg-white font-medium">
-                    <option value="">-- Pilih Gelombang Industri (Sisa Kuota Tersedia) --</option>
-                    @forelse($companySlots as $slot)
-                        @php
-                            $sisa = $slot->quota - ($slot->terisi ?? 0);
-                            $isSelected = ($placement->company_slot_id === $slot->id) ? 'selected' : '';
-                        @endphp
-                        <option value="{{ $slot->id }}" {{ $isSelected }}>
-                            {{ $slot->company->name }} - {{ $slot->batch_name }} (Sisa Kuota: {{ $sisa }})
-                        </option>
-                    @empty
-                        <option value="" disabled>-- Maaf, tidak ada slot tersisa untuk gender ini --</option>
-                    @endforelse
-                </select>
-                @error('company_slot_id') <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p> @enderror
-            </div>
+                    </div>
+                </div>
 
-            <div>
-                <label class="block text-sm font-bold text-gray-700 mb-2">Catatan Intervensi (Opsional)</label>
-                <textarea name="notes" rows="3" placeholder="Contoh: Titipan Waka Kurikulum, Pengecualian Syarat Tinggi Badan..." class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-3 bg-gray-50">{{ old('notes', $placement->notes) }}</textarea>
-            </div>
+                <div id="moveCompanySection" class="animate-fade-in p-5 bg-gray-50 border border-gray-100 rounded-xl">
+                    <label class="block text-sm font-extrabold text-gray-700 mb-2">Tujuan Perusahaan & Gelombang Baru:</label>
+                    <select name="company_slot_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-3 bg-white font-bold text-gray-700 cursor-pointer">
+                        <option value="">-- Pilih Tujuan Industri --</option>
+                        @foreach($allSlots as $slot)
+                            @php
+                                $used = \App\Models\Placement::where('company_slot_id', $slot->id)->where('status_pencocokan', 'final')->count();
+                                $available = max(0, $slot->quota - $used);
+                            @endphp
+                            <option value="{{ $slot->id }}">
+                                {{ $slot->company->name }} - Batch: {{ $slot->batch_name }} (Sisa Kuota: {{ $available }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-            <div class="flex justify-end pt-4 border-t border-gray-100">
-                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-xl shadow-md transition text-sm">
-                    ⚠️ Simpan Intervensi (Jadikan Final)
-                </button>
+                <div>
+                    <label class="block text-sm font-extrabold text-gray-700 mb-2">Catatan / Alasan Kronologis (Wajib):</label>
+                    <textarea name="notes" rows="4" required class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-3 bg-gray-50 focus:bg-white transition" placeholder="Jelaskan alasan spesifik... (Contoh: Penempatan dibatalkan karena wali siswa tidak mengizinkan penempatan di luar kota)"></textarea>
+                    <p class="text-xs text-gray-400 font-medium mt-2">*Catatan ini akan terekam permanen di Excel/PDF untuk transparansi kepada sekolah dan wali.</p>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                    <a href="{{ route('admin.placements.index') }}" class="px-6 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-sm hover:bg-gray-200 transition">Batal</a>
+                    <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Simpan Intervensi
+                    </button>
+                </div>
+
             </div>
         </form>
     </div>
 </div>
+
+<script>
+    function toggleInterventionForm() {
+        const actionType = document.querySelector('input[name="action_type"]:checked').value;
+        const moveSection = document.getElementById('moveCompanySection');
+        const companySelect = document.querySelector('select[name="company_slot_id"]');
+        
+        if(actionType === 'cancel') {
+            moveSection.style.display = 'none';
+            companySelect.removeAttribute('required');
+        } else {
+            moveSection.style.display = 'block';
+            companySelect.setAttribute('required', 'required');
+        }
+    }
+    document.addEventListener("DOMContentLoaded", toggleInterventionForm);
+</script>
 @endsection

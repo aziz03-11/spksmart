@@ -54,10 +54,6 @@ class SpkController extends Controller
             return back()->with('error', 'Tidak ada Tahun Ajaran yang sedang aktif.');
         }
 
-        // =========================================================================
-        // UPDATE PERBAIKAN: PERLINDUNGAN DATA FINAL (LOCK MECHANISM)
-        // =========================================================================
-
         // 1. Ambil ID siswa-siswa yang status penempatannya SUDAH FINAL di periode ini
         $finalizedStudentIds = Placement::where('academic_year_id', $activeYear->id)
             ->where('status_pencocokan', 'final')
@@ -66,7 +62,7 @@ class SpkController extends Controller
 
         // 2. Cek apakah ada siswa (yang BELUM FINAL) tapi belum punya nilai
         $studentsWithoutAssessment = Student::where('academic_year_id', $activeYear->id)
-            ->whereNotIn('id', $finalizedStudentIds) // Abaikan siswa yang sudah final
+            ->whereNotIn('id', $finalizedStudentIds)
             ->doesntHave('assessment')
             ->count();
 
@@ -83,7 +79,6 @@ class SpkController extends Controller
                 ->delete();
 
             // 4. Panggil Service Engine
-            // Catatan: Pastikan di dalam SmartEngineService Anda juga mengecualikan siswa yang id-nya ada di $finalizedStudentIds saat melakukan query $students = Student::all() atau sejenisnya.
             $this->smartEngine->runMatchmaking($activeYear->id, $finalizedStudentIds);
 
             DB::commit();
@@ -97,82 +92,99 @@ class SpkController extends Controller
         }
     }
 
-    // ========================================================
-    // FITUR: MANUAL OVERRIDE (INTERVENSI MANUAL)
-    // ========================================================
-
     public function edit(Placement $placement)
     {
         $placement->load(['student.major', 'student.assessment', 'company', 'companySlot']);
         
         $studentGender = $placement->student->gender;
 
-        // Load slot beserta jumlah yang terisi, lalu langsung FILTER di level query dan koleksi
-        $companySlots = CompanySlot::with('company')
+        $allSlots = CompanySlot::with('company')
             ->withCount(['placements as terisi' => function ($query) {
                 $query->where('status_pencocokan', 'final');
             }])
             ->where('academic_year_id', $placement->academic_year_id)
-            // 1. FILTER GENDER: Tampilkan yang 'Semua' atau yang sesuai dengan gender siswa
             ->where(function($q) use ($studentGender) {
                 $q->where('gender_requirement', 'Semua')
                   ->orWhere('gender_requirement', $studentGender);
             })
             ->get()
-            // 2. FILTER KUOTA: Sembunyikan (*hide*) jika sisa kuota sudah habis/minus
             ->filter(function($slot) {
                 return ($slot->quota - $slot->terisi) > 0;
             });
 
-        return view('admin.placements.edit', compact('placement', 'companySlots'));
+        return view('admin.placements.edit', compact('placement', 'allSlots'));
     }
 
     public function update(Request $request, Placement $placement)
     {
         $validated = $request->validate([
-            'company_slot_id' => 'required|exists:company_slots,id',
-            'notes' => 'nullable|string'
+            'action_type' => 'required|in:move,cancel',
+            'company_slot_id' => 'required_if:action_type,move',
+            'notes' => 'required|string'
         ]);
 
-        $slot = CompanySlot::findOrFail($validated['company_slot_id']);
-        $studentGender = $placement->student->gender;
-
-        // --- VALIDASI KEAMANAN BACK-END ---
-
-        // 1. Cegah paksaan jika gender tidak sesuai
-        if ($slot->gender_requirement !== 'Semua' && $slot->gender_requirement !== $studentGender) {
-            return back()->with('error', 'Gagal: Gender siswa tidak memenuhi syarat perusahaan ini.')->withInput();
-        }
-
-        // 2. Cegah paksaan jika kuota benar-benar sudah penuh
-        $terisi = \App\Models\Placement::where('company_slot_id', $slot->id)
-            ->where('status_pencocokan', 'final')
-            ->count();
+        // ==========================================
+        // TINDAKAN 1: BATALKAN PENEMPATAN
+        // ==========================================
+        if ($validated['action_type'] === 'cancel') {
             
-        if (($slot->quota - $terisi) <= 0) {
-            return back()->with('error', 'Gagal: Kuota untuk industri ini sudah penuh, silakan pilih industri lain.')->withInput();
+            // Logika Cerdas: Jika sebelumnya siswa punya perusahaan (berarti lolos kualifikasi),
+            // kembalikan ke Waiting List. Jika dari awal memang tidak lulus, tetapkan di Pembinaan.
+            $newStatus = ($placement->company_id !== null) ? 'waiting_list' : 'pembinaan';
+
+            $placement->update([
+                'company_id' => null,
+                'company_slot_id' => null,
+                'status_pencocokan' => $newStatus,
+                'placement_method' => 'MANUAL_OVERRIDE',
+                'notes' => "DIBATALKAN KEPALA HUBIN:\n" . $validated['notes'],
+            ]);
+
+            if ($placement->student) {
+                $placement->student->update(['status' => $newStatus]);
+            }
+
+            $pesan = $newStatus === 'waiting_list' 
+                     ? 'Penempatan dibatalkan. Karena nilai mencukupi, siswa dialihkan ke status Waiting List.' 
+                     : 'Intervensi dibatalkan. Siswa dikembalikan ke daftar Pembinaan.';
+                     
+            return redirect()->route('admin.placements.index')->with('success', $pesan);
         }
 
-        // --- JIKA AMAN, LANJUTKAN PROSES ---
+        // ==========================================
+        // TINDAKAN 2: PINDAH KE PT / GELOMBANG LAIN
+        // ==========================================
+        if ($validated['action_type'] === 'move') {
+            $slot = CompanySlot::findOrFail($validated['company_slot_id']);
+            $studentGender = $placement->student->gender;
 
-        $placement->update([
-            'company_id' => $slot->company_id,
-            'company_slot_id' => $slot->id,
-            'status_pencocokan' => 'final',
-            'placement_method' => 'MANUAL_OVERRIDE',
-            'notes' => $validated['notes'] ? "INTERVENSI MANUAL: " . $validated['notes'] : "Diintervensi secara manual oleh Hubin."
-        ]);
+            if ($slot->gender_requirement !== 'Semua' && $slot->gender_requirement !== $studentGender) {
+                return back()->with('error', 'Gagal: Gender siswa tidak memenuhi syarat perusahaan ini.')->withInput();
+            }
 
-        if ($placement->student) {
-            $placement->student->update(['status' => 'lolos_prakerin']);
+            $terisi = \App\Models\Placement::where('company_slot_id', $slot->id)
+                ->where('status_pencocokan', 'final')
+                ->count();
+                
+            if (($slot->quota - $terisi) <= 0) {
+                return back()->with('error', 'Gagal: Kuota untuk industri ini sudah penuh, silakan pilih industri lain.')->withInput();
+            }
+
+            $placement->update([
+                'company_id' => $slot->company_id,
+                'company_slot_id' => $slot->id,
+                'status_pencocokan' => 'rekomendasi',
+                'placement_method' => 'MANUAL_OVERRIDE',
+                'notes' => "DIPINDAHKAN KEPALA HUBIN:\n" . $validated['notes']
+            ]);
+
+            if ($placement->student) {
+                $placement->student->update(['status' => 'proses_seleksi']);
+            }
+
+            return redirect()->route('admin.placements.index')->with('success', 'Siswa berhasil dipindahkan ke Perusahaan baru. Silakan klik ACC Hubin untuk mem-Final-kan.');
         }
-
-        return redirect()->route('admin.placements.index')->with('success', 'Intervensi manual berhasil disimpan dan status menjadi Final.');
     }
-
-    // ========================================================
-    // FITUR: ACC HUBIN & EXPORT
-    // ========================================================
 
     public function accHubin(Placement $placement)
     {
@@ -194,7 +206,7 @@ class SpkController extends Controller
     public function exportExcel(Request $request)
     {
         $academicYearId = $request->get('academic_year_id', AcademicYear::where('is_active', true)->first()->id ?? 1);
-        $filename = 'Rekap_Penempatan_Prakerin_Periode_' . date('Y_m_d_His') . '.xlsx';
+        $filename = 'Rekap_Draft_Penempatan_Periode_' . date('Y_m_d_His') . '.xlsx';
         return Excel::download(new PlacementsExport($academicYearId), $filename);
     }
 
@@ -217,6 +229,6 @@ class SpkController extends Controller
         $pdf = Pdf::loadView('admin.placements.pdf', compact('placements', 'selectedYear'));
         $pdf->setPaper('a4', 'landscape');
 
-        return $pdf->stream('Laporan_Penempatan_Prakerin_' . str_replace(['/', '\\'], '-', $selectedYear->name) . '.pdf');
+        return $pdf->stream('Laporan_Draft_Penempatan_Prakerin_' . str_replace(['/', '\\'], '-', $selectedYear->name) . '.pdf');
     }
 }

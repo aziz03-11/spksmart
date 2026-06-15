@@ -12,8 +12,9 @@
             margin: 20px 40px; 
         }
         
-        /* ... CSS Kop Surat & Info Surat tetap sama ... */
-        .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+        /* ... CSS Kop Surat & Info Surat ... */
+        /* Tambahan: position relative agar logo (absolute) tidak keluar dari area kop */
+        .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; position: relative; }
         .kop-surat h2, .kop-surat h3, .kop-surat p { margin: 0; }
         .kop-surat h2 { font-size: 18px; text-transform: uppercase; font-weight: bold; }
         .kop-surat h1 { font-size: 22px; text-transform: uppercase; font-weight: bold; margin: 0; }
@@ -43,11 +44,29 @@
 </head>
 <body>
 
+    @php
+        // Amankan data setting terbaru
+        $appSetting = \App\Models\AppSetting::first();
+    @endphp
+
     <div class="kop-surat">
-        <h2>{{ $settings->instansi_atas ?? 'PEMERINTAH PROVINSI JAWA BARAT' }}</h2>
-        <h2>DINAS PENDIDIKAN</h2>
-        <h1>{{ $settings->nama_sekolah ?? 'SMK NEGERI 1 SPK' }}</h1>
-        <p>{{ $settings->alamat_sekolah ?? 'Jl. Pendidikan No. 123, Alamat Sekolah, Kode Pos 12345' }}</p>
+        
+        @if($appSetting && $appSetting->logo_path && file_exists(storage_path('app/public/' . $appSetting->logo_path)))
+            @php
+                $imagePath = storage_path('app/public/' . $appSetting->logo_path);
+                $imageData = base64_encode(file_get_contents($imagePath));
+                $imageSrc = 'data:' . mime_content_type($imagePath) . ';base64,' . $imageData;
+            @endphp
+            <img src="{{ $imageSrc }}" alt="Logo Sekolah" style="position: absolute; left: 0px; top: 0px; width: 85px; height: auto; max-height: 95px; object-fit: contain;">
+        @endif
+
+        <div style="padding-left: 90px; padding-right: 90px;">
+            <h2>{{ $settings->instansi_atas ?? 'PEMERINTAH PROVINSI JAWA BARAT' }}</h2>
+            <h2>DINAS PENDIDIKAN</h2>
+            <h1>{{ $settings->nama_sekolah ?? 'SMK NEGERI 1 SPK' }}</h1>
+            <p>{{ $settings->alamat_sekolah ?? 'Jl. Pendidikan No. 123, Alamat Sekolah, Kode Pos 12345' }}</p>
+            <p>Telp: {{ $settings->telepon_sekolah ?? '-' }} | Email: {{ $settings->email_sekolah ?? '-' }}</p>
+        </div>
     </div>
 
     <div class="info-surat">
