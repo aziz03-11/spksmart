@@ -12,8 +12,6 @@
             margin: 20px 40px; 
         }
         
-        /* ... CSS Kop Surat & Info Surat ... */
-        /* Tambahan: position relative agar logo (absolute) tidak keluar dari area kop */
         .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; position: relative; }
         .kop-surat h2, .kop-surat h3, .kop-surat p { margin: 0; }
         .kop-surat h2 { font-size: 18px; text-transform: uppercase; font-weight: bold; }
@@ -28,7 +26,7 @@
         
         /* OPTIMASI UNTUK BANYAK SISWA (30+ SISWA) */
         .content-table { width: 100%; margin: 15px 0; border-collapse: collapse; }
-        .content-table th, .content-table td { padding: 6px; border: 1px solid #000; }
+        .content-table th, .content-table td { padding: 8px 6px; border: 1px solid #000; font-size: 13px; }
         .content-table th { background-color: #f2f2f2; }
         
         /* Trik DomPDF: Mengulang header tabel di setiap halaman baru */
@@ -45,8 +43,17 @@
 <body>
 
     @php
-        // Amankan data setting terbaru
+        // Amankan data setting terbaru untuk pemanggilan logo sekolah
         $appSetting = \App\Models\AppSetting::first();
+
+        // Ambil sampel tanggal pelaksanaan dari siswa pertama untuk narasi surat
+        $firstPlacement = $placements->first();
+        $startPrakerin = $firstPlacement && $firstPlacement->companySlot && $firstPlacement->companySlot->start_date 
+            ? \Carbon\Carbon::parse($firstPlacement->companySlot->start_date)->translatedFormat('d F Y') 
+            : null;
+        $endPrakerin = $firstPlacement && $firstPlacement->companySlot && $firstPlacement->companySlot->end_date 
+            ? \Carbon\Carbon::parse($firstPlacement->companySlot->end_date)->translatedFormat('d F Y') 
+            : null;
     @endphp
 
     <div class="kop-surat">
@@ -106,28 +113,44 @@
             {{ $settings->teks_pengantar_surat ?? 'Dalam rangka pelaksanaan program Pendidikan Sistem Ganda (PSG) dan untuk meningkatkan kompetensi lulusan Sekolah Menengah Kejuruan (SMK), kami memohon kesediaan Bapak/Ibu untuk menerima siswa kami melaksanakan Praktik Kerja Industri (Prakerin) di instansi/perusahaan yang Bapak/Ibu pimpin.' }}
         </p>
         
+        @if($startPrakerin && $endPrakerin)
         <p>
-            Adapun siswa yang direkomendasikan adalah sebagai berikut:
+            Adapun waktu pelaksanaan Prakerin ini direncanakan berlangsung mulai tanggal <b>{{ $startPrakerin }}</b> sampai dengan <b>{{ $endPrakerin }}</b> (atau menyesuaikan rincian jadwal gelombang masing-masing siswa).
+        </p>
+        @endif
+        
+        <p>
+            Daftar siswa yang kami rekomendasikan adalah sebagai berikut:
         </p>
 
         <table class="content-table">
             <thead>
                 <tr>
                     <th style="width: 5%;">No</th>
-                    <th style="width: 35%;">Nama Lengkap</th>
-                    <th style="width: 20%;">NISN</th>
-                    <th style="width: 25%;">Kelas / Jurusan</th>
-                    <th style="width: 15%;">Gelombang</th>
+                    <th style="width: 30%;">Nama Lengkap</th>
+                    <th style="width: 15%;">NISN</th>
+                    <th style="width: 20%;">Kelas / Jurusan</th>
+                    <th style="width: 30%;">Gelombang & Waktu Pelaksanaan</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($placements as $index => $placement)
                 <tr>
                     <td style="text-align: center;">{{ $index + 1 }}</td>
-                    <td>{{ $placement->student->name ?? '-' }}</td>
+                    <td><b>{{ $placement->student->name ?? '-' }}</b></td>
                     <td style="text-align: center;">{{ $placement->student->nisn ?? '-' }}</td>
                     <td style="text-align: center;">XII / {{ $placement->student->major->name ?? '-' }}</td>
-                    <td style="text-align: center;">{{ $placement->companySlot->batch_name ?? '-' }}</td>
+                    
+                    <td style="text-align: center;">
+                        <span style="font-weight: bold; display: block;">{{ $placement->companySlot->batch_name ?? 'Utama' }}</span>
+                        <span style="font-size: 11px; color: #444; display: block; margin-top: 2px;">
+                            @if($placement->companySlot && $placement->companySlot->start_date && $placement->companySlot->end_date)
+                                ({{ \Carbon\Carbon::parse($placement->companySlot->start_date)->translatedFormat('d M Y') }} s.d {{ \Carbon\Carbon::parse($placement->companySlot->end_date)->translatedFormat('d M Y') }})
+                            @else
+                                (Jadwal belum ditentukan)
+                            @endif
+                        </span>
+                    </td>
                 </tr>
                 @endforeach
             </tbody>
